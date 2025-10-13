@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Книжный магазин</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="#/" class="logo">BookStore</a>
+    <nav class="nav" aria-label="Основная навигация">
+      <a href="#/" data-link>Главная</a>
+      <a href="#/store" data-link>Магазин</a>
+      <a href="#/profile" data-link class="auth-only" hidden>Профиль</a>
+      <a href="#/login" data-link class="guest-only">Вход</a>
+      <a href="#/register" data-link class="guest-only">Регистрация</a>
+      <button id="logoutBtn" class="auth-only btn-link" hidden>Выход</button>
+      <a href="#/store" class="cart-link" aria-label="Корзина">
+        🛒 <span id="cartCount">0</span>
+      </a>
+    </nav>
+  </div>
+  <div id="routeAlert" role="status" aria-live="polite" class="route-alert" hidden></div>
+  </header>
+
+<main class="container" id="app" role="main">
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <small>© <span id="year"></span> BookStore — учебный проект</small>
+  </div>
+  </footer>
+
+<script src="script.js" defer></script>
+</body>
+</html>
+
+
