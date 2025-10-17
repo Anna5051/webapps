@@ -11,6 +11,40 @@ const state = {
 	cart: [], 
 };
 
+// ---- Persistence helpers (localStorage) ----
+const LS_KEYS = {
+	users: 'bookstore_users',
+	session: 'bookstore_session',
+	cart: 'bookstore_cart'
+};
+
+function saveUsers() {
+	try { localStorage.setItem(LS_KEYS.users, JSON.stringify(state.users)); } catch {}
+}
+
+function saveSession() {
+	try { localStorage.setItem(LS_KEYS.session, JSON.stringify(state.session)); } catch {}
+}
+
+function saveCart() {
+	try { localStorage.setItem(LS_KEYS.cart, JSON.stringify(state.cart)); } catch {}
+}
+
+function loadPersisted() {
+	try {
+		const users = JSON.parse(localStorage.getItem(LS_KEYS.users) || '[]');
+		if (Array.isArray(users)) state.users = users;
+	} catch {}
+	try {
+		const session = JSON.parse(localStorage.getItem(LS_KEYS.session) || 'null');
+		state.session = session && typeof session === 'object' ? session : null;
+	} catch {}
+	try {
+		const cart = JSON.parse(localStorage.getItem(LS_KEYS.cart) || '[]');
+		if (Array.isArray(cart)) state.cart = cart;
+	} catch {}
+}
+
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -54,8 +88,9 @@ function updateAuthUI() {
 	$$('.guest-only').forEach(el => el.hidden = isAuth);
 	$('#logoutBtn').onclick = () => {
 		state.session = null;
+		saveSession();
 		setAlert('Вы вышли из системы');
-		navigate('#/');
+		navigate('#/login');
 	};
 }
 
@@ -95,8 +130,10 @@ function ViewRegister() {
 			<label>Учетное имя (логин)*<input required name="username" autocomplete="username"></label>
 			<label>Email*<input required name="email" type="email" autocomplete="email"></label>
 			<label>Пароль*<input required name="password" type="password" minlength="6" pattern="(?=.*[A-Za-z]).{6,}" title="Минимум 6 символов и хотя бы одна буква" autocomplete="new-password"></label>
-			<label>Имя<input name="firstName" autocomplete="given-name"></label>
-			<label>Фамилия<input name="lastName" autocomplete="family-name"></label>
+			<div class="row">
+				<label>Имя<input name="firstName" autocomplete="given-name"></label>
+				<label>Фамилия<input name="lastName" autocomplete="family-name"></label>
+			</div>
 			<label>Дата рождения<input name="birthDate" type="date" min="1900-01-01" max="2025-01-01"></label>
 			<label>Страна<select name="country">${renderCountryOptions('')}</select></label>
 			<button class="btn primary" type="submit">Создать аккаунт</button>
@@ -113,6 +150,7 @@ function ViewLogin() {
 		<form id="loginForm" class="form">
 			<label>Email<input required name="email" type="email" autocomplete="email"></label>
 			<label>Пароль<input required name="password" type="password" minlength="6" pattern="(?=.*[A-Za-z]).{6,}" title="Минимум 6 символов и хотя бы одна буква" autocomplete="current-password"></label>
+			<label><input type="checkbox" name="remember"> Запомнить меня</label>
 			<button class="btn primary" type="submit">Войти</button>
 		</form>
 		<p class="muted">Нет аккаунта? <a href="#/register">Регистрация</a></p>
@@ -129,8 +167,10 @@ function ViewProfile() {
 		<form id="profileForm" class="form">
 			<label>Логин<input name="username" value="${user.username || ''}" required autocomplete="username"></label>
 			<label>Email<input name="email" type="email" value="${user.email}" required autocomplete="email"></label>
-			<label>Имя<input name="firstName" value="${user.firstName || ''}" autocomplete="given-name"></label>
-			<label>Фамилия<input name="lastName" value="${user.lastName || ''}" autocomplete="family-name"></label>
+			<div class="row">
+				<label>Имя<input name="firstName" value="${user.firstName || ''}" autocomplete="given-name"></label>
+				<label>Фамилия<input name="lastName" value="${user.lastName || ''}" autocomplete="family-name"></label>
+			</div>
 			<label>Дата рождения<input name="birthDate" type="date" value="${user.birthDate || ''}" min="1900-01-01" max="2025-01-01"></label>
 			<label>Страна<select name="country">${renderCountryOptions(user.country || '')}</select></label>
 			<div style="display:flex; gap:8px;">
@@ -214,6 +254,13 @@ const routes = {
 function render() {
 	const app = $('#app');
 	const path = (location.hash.slice(1) || '/');
+	// Route guarding: redirect guests away from protected pages
+	const protectedPaths = ['/profile', '/store'];
+	if (protectedPaths.includes(path) && !currentUser()) {
+		location.hash = '#/login';
+		setAlert('Требуется вход');
+		return;
+	}
 	const view = routes[path] || (() => `<section><h2>404</h2></section>`);
 	app.innerHTML = view();
 	bindViewEvents(path);
@@ -259,6 +306,7 @@ function bindViewEvents(path) {
 				country
 			};
 			state.users.push(user);
+			saveUsers();
 
 			setAlert('Регистрация успешна, выполните вход');
 			navigate('#/login');
@@ -271,14 +319,16 @@ function bindViewEvents(path) {
 			const fd = new FormData(e.target);
 			const email = (fd.get('email') || '').toString().trim().toLowerCase();
 			const password = (fd.get('password') || '').toString();
+			const remember = fd.get('remember') === 'on';
 			const user = state.users.find(u => u.email === email && u.passwordHash === hash(password));
 			if (!user) {
 				setAlert('Неверные учетные данные');
 				return;
 			}
 			state.session = { userId: user.id };
+			if (remember) saveSession(); else localStorage.removeItem(LS_KEYS.session);
 			setAlert('Вы вошли');
-			navigate('#/profile');
+			navigate('#/store');
 		});
 	}
 
@@ -314,6 +364,7 @@ function bindViewEvents(path) {
 			user.lastName = lastName;
 			user.birthDate = birthDate;
 			user.country = country;
+			saveUsers();
 			setAlert('Профиль обновлен');
 		});
 
@@ -329,6 +380,7 @@ function bindViewEvents(path) {
 			const item = state.cart.find(i => i.bookId === id);
 			if (item) item.qty += 1; else state.cart.push({ bookId: id, qty: 1 });
 			updateCartSidebar();
+			saveCart();
 			updateCartUI();
 		});
 
@@ -351,6 +403,7 @@ function bindViewEvents(path) {
 			if (act === 'dec') item.qty -= 1;
 			if (item.qty <= 0) state.cart = state.cart.filter(i => i.bookId !== id);
 			updateCartSidebar();
+			saveCart();
 			updateCartUI();
 		});
 
@@ -367,6 +420,7 @@ function bindViewEvents(path) {
 			}, 0);
 			state.cart = [];
 			updateCartSidebar();
+			saveCart();
 			updateCartUI();
 			setAlert(`Заказ оформлен на сумму ${formatPrice(total)}`);
 		});
@@ -401,6 +455,9 @@ function updateCartSidebar() {
 
 function init() {
 	$('#year').textContent = String(new Date().getFullYear());
+	const authorEl = $('#authorName');
+	if (authorEl) authorEl.textContent = 'Михайлова Анна Сергеевна';
+	loadPersisted();
 	window.addEventListener('hashchange', render);
 	if (!location.hash) location.hash = '#/';
 	render();

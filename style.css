@@ -184,6 +184,13 @@ body {
     color: var(--text)
 }
 
+.form .row {
+	display: flex;
+	gap: 10px
+}
+
+.form .row > label { flex: 1 }
+
 .store {
 	display: grid;
 	grid-template-columns: 1fr 320px;
